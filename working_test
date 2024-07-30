@@ -1,0 +1,34 @@
+import azure.functions as func
+import logging
+from azure.cosmos import exceptions, CosmosClient, partition_key
+
+app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
+
+@app.function_name(name="testingfun")
+@app.route(route="testingfun", methods=["GET"])
+def testingfun(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info('Python HTTP trigger function processed a request.')
+
+    URL = 'https://danscosmosdb.documents.azure.com:443/'
+    KEY = ''
+
+    client = CosmosClient(URL, credential=KEY)
+    DATABASE_NAME = 'ResumeCounterBase'
+    database = client.get_database_client(DATABASE_NAME)
+    CONTAINER_NAME = 'CounterContainer'
+    container = database.get_container_client(CONTAINER_NAME)
+    ITEM_ID = 'item2'
+    partition_key_value = 'newpart'
+
+    try:
+        item = container.read_item(ITEM_ID, partition_key=partition_key_value)
+        logging.info(f"Read item: {item}")
+        item['count'] += 1
+        logging.info(f"Updated item: {item}")
+        container.replace_item(ITEM_ID, item)
+        logging.info("Item updated successfully")
+    except exceptions.CosmosHttpResponseError as e:
+        logging.error(f"Error updating item: {e}")
+        return func.HttpResponse(f"Error updating item: {e}", status_code=500)
+
+    return func.HttpResponse("Item updated successfully", status_code=200)
